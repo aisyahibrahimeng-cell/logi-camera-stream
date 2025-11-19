@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RC Car Controller</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: #000;
+    }
+
+    /* Fullscreen livestream */
+    #cam-feed {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+
+    /* Control buttons overlay */
+    .control-grid {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: repeat(3, 80px);
+      grid-gap: 10px;
+      justify-content: center;
+      pointer-events: auto;
+    }
+
+    .button {
+      width: 80px;
+      height: 80px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border-radius: 12px;
+      font-size: 24px;
+      border: 2px solid #00c853;
+      transition: 0.2s;
+    }
+
+    .button:active {
+      background: #00c853;
+      transform: scale(0.95);
+    }
+
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #00c853;
+      font-size: 16px;
+      background: rgba(0,0,0,0.5);
+      padding: 5px 10px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- WebSocket Livestream -->
+  <img id="cam-feed" alt="Camera Stream">
+
+  <p id="status">Connecting...</p>
+
+  <div class="control-grid">
+    <div></div>
+    <button class="button" id="forward">▲</button>
+    <div></div>
+
+    <button class="button" id="left">◀</button>
+    <button class="button" id="stop">■</button>
+    <button class="button" id="right">▶</button>
+
+    <div></div>
+    <button class="button" id="backward">▼</button>
+    <div></div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const camFeed = document.getElementById("cam-feed");
+
+    // ----- Connect to Render WebSocket livestream -----
+    const ws = new WebSocket("wss://logi-camera-stream.onrender.com/ws");
+
+    ws.onopen = () => {
+      statusEl.textContent = "✅ Connected to livestream";
+      statusEl.style.color = "#00c853";
+    };
+
+    ws.onmessage = (event) => {
+      // Receive Base64 JPEG frames and display
+      camFeed.src = "data:image/jpeg;base64," + event.data;
+    };
+
+    ws.onclose = () => {
+      statusEl.textContent = "❌ Livestream disconnected";
+      statusEl.style.color = "red";
+    };
+
+    ws.onerror = (err) => {
+      console.error(err);
+      statusEl.textContent = "❌ Livestream error";
+      statusEl.style.color = "red";
+    };
+
+    // ----- HTTP command sender -----
+    async function sendCommand(cmd) {
+      try {
+        const resp = await fetch("http://YOUR_FLASK_SERVER_IP:3000/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cmd })
+        });
+        if (resp.ok) {
+          statusEl.textContent = `Command sent: ${cmd}`;
+          statusEl.style.color = "#00c853";
+        } else {
+          statusEl.textContent = "Failed to send command!";
+          statusEl.style.color = "red";
+        }
+      } catch (err) {
+        statusEl.textContent = "Error connecting to server!";
+        statusEl.style.color = "red";
+        console.error(err);
+      }
+    }
+
+    // ----- Button controls -----
+    document.getElementById("forward").addEventListener("click", () => sendCommand("forward"));
+    document.getElementById("backward").addEventListener("click", () => sendCommand("backward"));
+    document.getElementById("left").addEventListener("click", () => sendCommand("left"));
+    document.getElementById("right").addEventListener("click", () => sendCommand("right"));
+    document.getElementById("stop").addEventListener("click", () => sendCommand("stop"));
+
+    // ----- Optional: gamepad controls -----
+    let lastCommand = "";
+    function pollGamepad() {
+      const gp = navigator.getGamepads()[0];
+      if (!gp) return;
+
+      const [lx, ly] = [gp.axes[0], gp.axes[1]];
+      let command = "";
+
+      if (ly < -0.5) command = "forward";
+      else if (ly > 0.5) command = "backward";
+      else if (lx < -0.5) command = "left";
+      else if (lx > 0.5) command = "right";
+      else command = "";
+
+      if (command && command !== lastCommand) {
+        sendCommand(command);
+        lastCommand = command;
+      } else if (!command && lastCommand !== "stop") {
+        sendCommand("stop");
+        lastCommand = "stop";
+      }
+    }
+
+    setInterval(pollGamepad, 100);
+    window.addEventListener("gamepadconnected", () => document.querySelector(".control-grid").style.display = "none");
+    window.addEventListener("gamepaddisconnected", () => document.querySelector(".control-grid").style.display = "grid");
+  </script>
+</body>
+</html>

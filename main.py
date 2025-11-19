@@ -18,7 +18,7 @@ HTML = """
 <h1>Logitech Camera Live</h1>
 <img id="stream" width="640">
 <script>
-let ws = new WebSocket("wss://" + location.host + "/ws");
+let ws = new WebSocket("wss://logi-camera-stream.onrender.com);
 let img = document.getElementById("stream");
 
 ws.onmessage = function(event){
