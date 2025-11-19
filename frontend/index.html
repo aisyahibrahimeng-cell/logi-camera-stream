@@ -110,26 +110,26 @@
     };
 
     // ----- HTTP command sender -----
-    async function sendCommand(cmd) {
-      try {
-        const resp = await fetch("http://YOUR_FLASK_SERVER_IP:3000/control", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cmd })
-        });
-        if (resp.ok) {
-          statusEl.textContent = `Command sent: ${cmd}`;
-          statusEl.style.color = "#00c853";
-        } else {
-          statusEl.textContent = "Failed to send command!";
-          statusEl.style.color = "red";
-        }
-      } catch (err) {
-        statusEl.textContent = "Error connecting to server!";
+   async function sendCommand(cmd) {
+    try {
+        const resp = await fetch("https://logi-camera-stream.onrender.com/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cmd })
+      });
+      if (resp.ok) {
+        statusEl.textContent = `Command sent: ${cmd}`;
+        statusEl.style.color = "#00c853";
+      } else {
+        statusEl.textContent = "Failed to send command!";
         statusEl.style.color = "red";
-        console.error(err);
       }
+    } catch (err) {
+      statusEl.textContent = "Error connecting to server!";
+      statusEl.style.color = "red";
+      console.error(err);
     }
+  }
 
     // ----- Button controls -----
     document.getElementById("forward").addEventListener("click", () => sendCommand("forward"));
