@@ -1,41 +1,41 @@
 from fastapi import FastAPI, WebSocket
-from fastapi.responses import HTMLResponse
+import asyncio
 
 app = FastAPI()
-clients = []
 
-HTML = """
-<!doctype html>
-<html>
-<head>
-<title>Camera Live</title>
-</head>
-<body>
-<h1>Live Camera</h1>
-<img id="stream" width="640">
-<script>
-let ws = new WebSocket("wss://" + location.host + "/ws");
-let img = document.getElementById("stream");
-ws.onmessage = function(event){
-    img.src = "data:image/jpeg;base64," + event.data;
-};
-</script>
-</body>
-</html>
-"""
+# Store viewer clients
+viewers = set()
 
 @app.get("/")
-async def index():
-    return HTMLResponse(HTML)
+async def home():
+    return {"status": "WebSocket server is running"}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    clients.append(websocket)
+    viewers.add(websocket)
+    print("Viewer connected")
+
     try:
         while True:
-            data = await websocket.receive_text()
-            for client in clients:
-                await client.send_text(data)
+            await asyncio.sleep(1)
     except:
-        clients.remove(websocket)
+        viewers.remove(websocket)
+
+@app.websocket("/upload")
+async def upload_endpoint(websocket: WebSocket):
+    """Raspberry Pi will connect here and send frames to viewers"""
+    await websocket.accept()
+    print("Pi connected")
+
+    try:
+        while True:
+            frame = await websocket.receive_text()  # Base64 frame
+            # Forward to all viewers
+            for v in viewers.copy():
+                try:
+                    await v.send_text(frame)
+                except:
+                    viewers.remove(v)
+    except:
+        print("Pi disconnected")
